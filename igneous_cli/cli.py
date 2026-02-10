@@ -16,6 +16,10 @@ import cloudvolume.paths
 
 from cloudfiles import CloudFiles
 import cloudfiles.paths
+try:
+  import dask.array as lib
+except ImportError:
+  import numpy as lib
 import numpy as np
 from taskqueue import TaskQueue, LocalTaskQueue
 from taskqueue.lib import toabs
@@ -1876,7 +1880,7 @@ def create(
 
   Supports: .npy, .h5/.hdf5, .nii/.nii.gz, .nrrd, and .ckl files
   
-  Hopefully will support others such as TIFF in the future.
+  Additionnal support is available with bioio
   """
   src = src.replace("file://", "")
   ext = normalize_file_ext(src)
@@ -1904,9 +1908,33 @@ def create(
     import h5py
     file = h5py.File(src, 'r')
     arr = np.array(file[h5_dataset])
+  elif ext in (".ome.tif", ".ome.tiff"):
+    from bioio import BioImage
+    import bioio_ome_tiff
+    img = BioImage(src, reader=bioio_ome_tiff.Reader)
+    print(img.shape)
+    arr = img.get_image_dask_data("ZYX").compute()
+  elif ext == ".ome.zarr":
+    from bioio import BioImage
+    import bioio_ome_zarr
+    img = BioImage(src, reader=bioio_ome_zarr.Reader)
+    print(img.shape)
+    arr = img.get_image_dask_data("ZYX").compute()
   else:
-    print(f"Format not supported: {ext}")
-    return
+    try:
+      import bioio_bioformats
+      bioio_exts = bioio_bioformats.ReaderMetadata().get_supported_extensions()
+    except ImportError:
+      bioio_exts = []
+    if ext in bioio_exts:
+      from bioio import BioImage
+      import bioio_bioformats
+      img = BioImage(src, reader=bioio_bioformats.Reader)
+      print(img.shape)
+      arr = img.get_image_dask_data("ZYX").compute()
+    else:
+      print(f"Format not supported: {ext}")
+      return
 
   while arr.ndim < 3:
     arr = arr[..., np.newaxis]
@@ -1936,6 +1964,8 @@ def normalize_file_ext(filename):
       return ext2
     elif ext2 == '.nii':
       return ext2
+    elif ext2 == '.ome':
+      return ext2 + ext
     elif ext2 == '':
       return ext
     ext = ext2

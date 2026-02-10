@@ -5,6 +5,10 @@ MYSQL = [ "mysql-connector-python" ]
 
 NII = [ "nibabel" ]
 NRRD = [ "pynrrd" ]
+BIOIO = [ "bioio",
+          "bioio-ome-zarr",
+          "bioio-bioformats",
+        ]
 
 setuptools.setup(
   setup_requires=['pbr', 'numpy'],
@@ -14,10 +18,11 @@ setuptools.setup(
     ],
   },
   extras_require={
+    "bioio": BIOIO,
     "mysql": MYSQL,
     "nrrd": NRRD,
     "nii": NII,
-    "all": MYSQL + NII + NRRD,
+    "all": BIOIO + MYSQL + NII + NRRD,
   },
   long_description_content_type="text/markdown",
   pbr=True,
